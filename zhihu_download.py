@@ -158,8 +158,8 @@ def download_images_from_html(page, dirname):
     print('下载', count, '张图片，请查看 ' + dir +' 目录')
 
 
-#todo: modify requests.get to https://www.zhihu.com/topic/19552207/hot format
-# transform 'topic' to topicID, such as 美女 to 19552207
+#modify requests.get to https://www.zhihu.com/topic/19550597/top_answers format
+# transform topic_search_keyword to topicID, such as 漫画 to 19550597
 def download_img_from_topic(topic_search_keyword):
     # params = {
     #     'type': 'topic',
