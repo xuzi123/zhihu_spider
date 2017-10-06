@@ -18,18 +18,18 @@ except:
 from urllib import request
 
 
-
+main_url = 'https://www.zhihu.com/'
 
 # 构造 Request headers
 agent = 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Mobile Safari/537.36'
 headers = {
     "Host": "www.zhihu.com",
-    "Referer": "https://www.zhihu.com/",
+    "Referer": main_url,
     'User-Agent': agent
 }
 
-url = 'https://www.zhihu.com/'
-r = requests.get(url,headers=headers)
+
+r = requests.get(main_url,headers=headers)
 print(r.cookies)
 
 # 使用登录cookie信息
@@ -60,7 +60,7 @@ def get_xsrf():
 # 获取验证码
 def get_captcha():
     t = str(int(time.time() * 1000))
-    captcha_url = 'https://www.zhihu.com/captcha.gif?r=' + t + "&type=login"
+    captcha_url = main_url + 'captcha.gif?r=' + t + "&type=login"
     r = session.get(captcha_url, headers=headers)
     with open('captcha.jpg', 'wb') as f:
         f.write(r.content)
@@ -94,7 +94,7 @@ def login(password, account):
     # 通过输入的用户名判断是否是手机号
     if re.match(r"^1\d{10}$", account):
         print("手机号登录 \n")
-        post_url = 'https://www.zhihu.com/login/phone_num'
+        post_url = main_url + 'login/phone_num'
         postdata = {
             '_xsrf': _xsrf,
             'password': password,
@@ -106,7 +106,7 @@ def login(password, account):
         else:
             print("你的账号输入有问题，请重新登录")
             return 0
-        post_url = 'https://www.zhihu.com/login/email'
+        post_url = main_url + 'login/email'
         postdata = {
             '_xsrf': _xsrf,
             'password': password,
@@ -132,34 +132,72 @@ except:
     pass
 
 
-def download_images_from_html(html, dirname):
+def download_images_from_html(page, dirname):
+    print('开始下载(', dirname, ')图片')
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    with open(dirname + '/' + dirname + 'topic.html','wb') as f:
+        f.write(page.content)
+        f.close()
     # get img label and img url
-    img_urls_label = re.findall(r'<img src=".*?"', html)
-    for label in img_urls_label:
-        # get url from img label
-        url = label[10:-1]
-        filename = label[-10:-1]
-        print(url)
+    img_urls = []
+    for url in re.findall(r'<img src=".*?"', page.text):
+        img_urls.append(url[10:-1])
+
+    for url in re.findall(r'img src=&quot;.*?&quot;', page.text):
+        img_urls.append(url[14:-6])
+
+    count = 0
+    for url in img_urls:
+        count += 1
+        filename = url[-10:]
         dir=os.path.abspath('./' + dirname + '/')
         img_path = os.path.join(dir, filename)
         request.urlretrieve(url, img_path)
-    print('下载完毕，请查看 ' + dir +' 目录')
+        print(img_path)
+    print('下载', count, '张图片，请查看 ' + dir +' 目录')
 
 
 #todo: modify requests.get to https://www.zhihu.com/topic/19552207/hot format
 # transform 'topic' to topicID, such as 美女 to 19552207
-def download_img_from_topic(topic):
-    print('topic = ' + topic)
+def download_img_from_topic(topic_search_keyword):
+    # params = {
+    #     'type': 'topic',
+    #     'q': topic_search_keyword
+    # }
+    # page = requests.get(main_url + 'search', params)
+
+    #print(page.url)
+    page = requests.get(main_url + 'search?type=topic&q='+topic_search_keyword,headers=headers)
+   
+
+    with open(topic_search_keyword + '/' + topic_search_keyword + 'topic.html','wb') as f:
+        f.write(page.content)
+        f.close()
+
+    # get first topic of topic_search_keyword search list
+    topic_sub_url = re.findall('"/topic/.*?"', page.text)
+    if len(topic_sub_url) == 0:
+        print("Sorry, no content for such topic!")
+        return
+
+    # real topic is the first one of search list
+    topic = re.findall('data-highlight>.*?</a>', page.text)[0][15:-4]
+    # 精华回答
+    topic_url = main_url + topic_sub_url[0][2:-1] + '/top-answers'
+    print(topic_url)
+    topic_hot_page = requests.get(topic_url, headers=headers)
+    download_images_from_html(topic_hot_page, topic)
 
 
 def download_img_from_search_content(content):
     if not os.path.exists(content):
         os.makedirs(content)
-    page = requests.get('https://www.zhihu.com/search?type=content&q='+content,headers=headers)
-    with open(content + '/' + content + '.html','wb') as f:
+    page = requests.get(main_url + 'search?type=content&q='+content,headers=headers)
+    with open(content + '/' + content + 'content.html','wb') as f:
         f.write(page.content)
         f.close()
-    download_images_from_html(page.text, content)
+    download_images_from_html(page, content)
 
 
 if __name__ == '__main__':
@@ -172,4 +210,5 @@ if __name__ == '__main__':
     #download all img from content in zhihu
     content = input('请输入你感兴趣的知乎话题,按回车结束后自动下载该话题下的图片\n> ')
     download_img_from_search_content(content)
+    download_img_from_topic(content)
 
